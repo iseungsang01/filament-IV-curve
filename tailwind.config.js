@@ -1,0 +1,18 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    "./src/**/*.{js,jsx,ts,tsx}",
+    "./public/index.html",
+  ],
+  theme: {
+    extend: {
+      fontFamily: {
+        'times': ['"Times New Roman"', 'Times', 'serif'],
+      },
+      animation: {
+        'spin': 'spin 1s linear infinite',
+      },
+    },
+  },
+  plugins: [],
+}
