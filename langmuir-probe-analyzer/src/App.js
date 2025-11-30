@@ -42,6 +42,7 @@ const App = () => {
       console.log(`Current range: ${Math.min(...current)} to ${Math.max(...current)}`);
       console.log(`Ion saturation voltage threshold: ${ionSaturationVoltage} V`);
 
+      // ⭐ 여기가 핵심! ionSaturationVoltage를 세 번째 인자로 전달
       const results = performFullAnalysis(voltage, current, ionSaturationVoltage);
 
       console.log('Analysis complete!');
@@ -106,7 +107,9 @@ const App = () => {
             </div>
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-2"
+              className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                showSettings ? 'bg-indigo-600 text-white' : 'bg-gray-100 hover:bg-gray-200'
+              }`}
             >
               <Settings className="w-5 h-5" />
               Settings
@@ -115,15 +118,15 @@ const App = () => {
 
           {/* Settings Panel */}
           {showSettings && (
-            <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-indigo-200">
-              <h3 className="font-bold text-indigo-900 mb-3 flex items-center gap-2">
+            <div className="mt-4 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-indigo-300">
+              <h3 className="font-bold text-indigo-900 mb-4 flex items-center gap-2 text-lg">
                 <Settings className="w-5 h-5" />
                 Analysis Parameters
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Ion Saturation Region Threshold (V)
+                  <label className="block text-sm font-bold text-gray-800 mb-2">
+                    ⚙️ Ion Saturation Region Threshold (V)
                   </label>
                   <div className="flex items-center gap-3">
                     <input
@@ -131,22 +134,35 @@ const App = () => {
                       value={ionSaturationVoltage}
                       onChange={(e) => setIonSaturationVoltage(parseFloat(e.target.value))}
                       step="10"
-                      className="w-32 px-3 py-2 border-2 border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-lg"
+                      className="w-40 px-4 py-3 border-2 border-indigo-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 font-mono text-xl font-bold text-indigo-900 bg-white"
                     />
-                    <span className="text-gray-600">V</span>
+                    <span className="text-gray-700 font-semibold text-lg">V</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Voltage below which data is used for CL model fitting (typically -60 to -100 V)
+                  <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                    💡 Voltage below which data is used for CL model fitting<br/>
+                    <span className="font-semibold">Typical range:</span> -60V to -100V
                   </p>
                 </div>
-                <div className="bg-white p-3 rounded-lg">
-                  <p className="text-sm font-semibold text-gray-700 mb-1">Current Setting:</p>
-                  <p className="text-2xl font-bold text-indigo-900 font-mono">V &lt; {ionSaturationVoltage} V</p>
-                  <p className="text-xs text-gray-600 mt-1">
-                    This region will be used to fit the Chen-Luhmann model for ion current
+                <div className="bg-white p-4 rounded-lg border-2 border-indigo-200 shadow-sm">
+                  <p className="text-sm font-bold text-gray-700 mb-2">📊 Current Setting:</p>
+                  <p className="text-3xl font-bold text-indigo-900 font-mono mb-2">
+                    V &lt; {ionSaturationVoltage} V
                   </p>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <p>✓ This region will be used to fit the Chen-Luhmann model for ion current</p>
+                    <p>✓ Make sure your data has enough points in this region</p>
+                  </div>
                 </div>
               </div>
+              
+              {/* 경고 메시지 */}
+              {rawData && (
+                <div className="mt-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                  <p className="text-sm text-yellow-800">
+                    <strong>⚠️ Note:</strong> After changing this value, click "Run Full Analysis" again to apply the new setting.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -227,7 +243,7 @@ const App = () => {
                       )}
                     </button>
                     <p className="text-sm text-gray-500 mt-3">
-                      Ion saturation threshold: V &lt; {ionSaturationVoltage} V
+                      <strong>Ion saturation threshold:</strong> V &lt; {ionSaturationVoltage} V
                     </p>
                   </div>
                 )}
@@ -255,7 +271,7 @@ const App = () => {
                     )}
                   </button>
                   <p className="text-sm text-gray-500 mt-3">
-                    Ion saturation threshold: V &lt; {ionSaturationVoltage} V
+                    <strong>Ion saturation threshold:</strong> V &lt; {ionSaturationVoltage} V
                   </p>
                 </div>
               </div>
