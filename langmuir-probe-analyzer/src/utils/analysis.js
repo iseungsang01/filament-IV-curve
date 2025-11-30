@@ -1,5 +1,5 @@
 import { savgolFilter, gradient } from './dataProcessing';
-import { linearFit, exponentialFit, fitCLModel } from './fitting';
+import { linearFit, fitCLModel } from './fitting';
 import { calculateIonDensity, calculateElectronDensity, CLModel } from './calculations';
 
 export const performFullAnalysis = (voltage, current) => {
@@ -34,6 +34,9 @@ export const performFullAnalysis = (voltage, current) => {
   const Te = 1 / teFit.m;
   
   console.log('Fixed Te:', Te);
+  
+  // 최종 CL fit 결과를 저장할 변수 선언
+  let clFit = { iSat: -5e-6, a: 0.5, T: Te };
   
   // 반복 루프
   while (Math.abs(VpNew - VpOld) > tolerance && iterationCount < maxIterations) {
@@ -80,7 +83,7 @@ export const performFullAnalysis = (voltage, current) => {
       }
     }
     
-    const clFit = fitCLModel(ionVoltages, ionData, VpNew);
+    clFit = fitCLModel(ionVoltages, ionData, VpNew);
     
     // Step 4: 전체 이온 전류 계산
     iIonFit = voltage.map(v => CLModel(v, VpNew, Te, clFit.iSat, clFit.a));
