@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlayCircle, AlertCircle, Download } from 'lucide-react';
+import { PlayCircle, AlertCircle, Download, Settings } from 'lucide-react';
 import FileUpload from './components/FileUpload';
 import RawDataView from './components/RawDataView';
 import AnalysisResults from './components/AnalysisResults';
@@ -11,6 +11,8 @@ const App = () => {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('upload');
+  const [ionSaturationVoltage, setIonSaturationVoltage] = useState(-80);
+  const [showSettings, setShowSettings] = useState(false);
 
   const handleFileLoad = (data) => {
     setRawData(data);
@@ -29,7 +31,6 @@ const App = () => {
     setError(null);
 
     try {
-      // 비동기 처리를 위한 setTimeout 사용
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const voltage = rawData.map(d => d.voltage);
@@ -39,8 +40,9 @@ const App = () => {
       console.log(`Data points: ${voltage.length}`);
       console.log(`Voltage range: ${Math.min(...voltage)} to ${Math.max(...voltage)}`);
       console.log(`Current range: ${Math.min(...current)} to ${Math.max(...current)}`);
+      console.log(`Ion saturation voltage threshold: ${ionSaturationVoltage} V`);
 
-      const results = performFullAnalysis(voltage, current);
+      const results = performFullAnalysis(voltage, current, ionSaturationVoltage);
 
       console.log('Analysis complete!');
       console.log('Results:', results);
@@ -59,6 +61,9 @@ const App = () => {
     if (!analysisResults) return;
 
     const results = {
+      analysisParameters: {
+        ionSaturationVoltageThreshold: ionSaturationVoltage
+      },
       summary: {
         plasmaPotential_V: analysisResults.Vp,
         electronTemperature_eV: analysisResults.Te,
@@ -87,15 +92,63 @@ const App = () => {
       <div className="w-full max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-xl p-6 mb-6">
-          <h1 className="text-3xl font-bold text-indigo-900 mb-2 flex items-center gap-2">
-            <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            Langmuir Probe Data Analyzer
-          </h1>
-          <p className="text-gray-600">
-            Advanced plasma diagnostics tool for electron temperature, density analysis, and EEDF calculation
-          </p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Langmuir Probe Data Analyzer
+              </h1>
+              <p className="text-gray-600">
+                Advanced plasma diagnostics tool for electron temperature, density analysis, and EEDF calculation
+              </p>
+            </div>
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <Settings className="w-5 h-5" />
+              Settings
+            </button>
+          </div>
+
+          {/* Settings Panel */}
+          {showSettings && (
+            <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-indigo-200">
+              <h3 className="font-bold text-indigo-900 mb-3 flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                Analysis Parameters
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Ion Saturation Region Threshold (V)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      value={ionSaturationVoltage}
+                      onChange={(e) => setIonSaturationVoltage(parseFloat(e.target.value))}
+                      step="10"
+                      className="w-32 px-3 py-2 border-2 border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-lg"
+                    />
+                    <span className="text-gray-600">V</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Voltage below which data is used for CL model fitting (typically -60 to -100 V)
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded-lg">
+                  <p className="text-sm font-semibold text-gray-700 mb-1">Current Setting:</p>
+                  <p className="text-2xl font-bold text-indigo-900 font-mono">V &lt; {ionSaturationVoltage} V</p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    This region will be used to fit the Chen-Luhmann model for ion current
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Main Content */}
@@ -174,7 +227,7 @@ const App = () => {
                       )}
                     </button>
                     <p className="text-sm text-gray-500 mt-3">
-                      This will perform iterative Vp convergence, ion/electron current separation, and EEDF calculation
+                      Ion saturation threshold: V &lt; {ionSaturationVoltage} V
                     </p>
                   </div>
                 )}
@@ -201,6 +254,9 @@ const App = () => {
                       'Run Full Analysis'
                     )}
                   </button>
+                  <p className="text-sm text-gray-500 mt-3">
+                    Ion saturation threshold: V &lt; {ionSaturationVoltage} V
+                  </p>
                 </div>
               </div>
             )}
@@ -218,7 +274,7 @@ const App = () => {
                     Export Results
                   </button>
                 </div>
-                <AnalysisResults rawData={rawData} results={analysisResults} />
+                <AnalysisResults rawData={rawData} results={analysisResults} ionSaturationVoltage={ionSaturationVoltage} />
               </div>
             )}
 

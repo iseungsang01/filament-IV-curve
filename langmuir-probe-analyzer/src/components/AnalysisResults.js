@@ -6,7 +6,7 @@ import DerivativeChart from './Charts/DerivativeChart';
 import ElectronCurrentChart from './Charts/ElectronCurrentChart';
 import EEDFChart from './Charts/EEDFChart';
 
-const AnalysisResults = ({ rawData, results }) => {
+const AnalysisResults = ({ rawData, results, ionSaturationVoltage }) => {
   const voltage = rawData.map(d => d.voltage);
   const current = rawData.map(d => d.current);
 
@@ -80,9 +80,9 @@ const AnalysisResults = ({ rawData, results }) => {
             I<sub>ion</sub>(V) = I<sub>sat</sub> × [1 + a × |V<sub>p</sub> - V|<sup>0.75</sup> / T<sub>e</sub><sup>0.75</sup>]
           </div>
           <ul className="ml-4 space-y-1">
-            <li>• 적용 영역: V &lt; -80V (이온 포화 영역)</li>
-            <li>• I<sub>sat</sub> = {results.iSat.toExponential(2)} A (이온 포화 전류)</li>
-            <li>• a = {results.a.toFixed(2)} (CL 계수, sheath expansion parameter)</li>
+            <li>• <strong>적용 영역:</strong> V &lt; {ionSaturationVoltage} V (이온 포화 영역)</li>
+            <li>• <strong>I<sub>sat</sub></strong> = {results.iSat.toExponential(2)} A (이온 포화 전류)</li>
+            <li>• <strong>a</strong> = {results.a.toFixed(2)} (CL 계수, sheath expansion parameter)</li>
             <li>• 이 모델은 sheath expansion 효과를 물리적으로 고려합니다</li>
           </ul>
         </div>

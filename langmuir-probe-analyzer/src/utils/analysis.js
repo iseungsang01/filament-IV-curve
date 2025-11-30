@@ -2,7 +2,7 @@ import { savgolFilter, gradient } from './dataProcessing';
 import { linearFit, fitCLModel } from './fitting';
 import { calculateIonDensity, calculateElectronDensity, CLModel } from './calculations';
 
-export const performFullAnalysis = (voltage, current) => {
+export const performFullAnalysis = (voltage, current, ionSaturationVoltage = -80) => {
   const maxIterations = 10;
   const tolerance = 1e-5;
   
@@ -34,6 +34,7 @@ export const performFullAnalysis = (voltage, current) => {
   const Te = 1 / teFit.m;
   
   console.log('Fixed Te:', Te);
+  console.log('Ion saturation voltage threshold:', ionSaturationVoltage);
   
   // 최종 CL fit 결과를 저장할 변수 선언
   let clFit = { iSat: -5e-6, a: 0.5, T: Te };
@@ -73,15 +74,17 @@ export const performFullAnalysis = (voltage, current) => {
     
     console.log(`Iteration ${iterationCount}: Vp = ${VpNew.toFixed(4)} V`);
     
-    // Step 3: 이온 전류 피팅
+    // Step 3: 이온 전류 피팅 (사용자 지정 전압 이하 사용)
     const ionData = [];
     const ionVoltages = [];
     for (let i = 0; i < voltage.length; i++) {
-      if (voltage[i] < -80) {
+      if (voltage[i] < ionSaturationVoltage) {
         ionData.push(current[i]);
         ionVoltages.push(voltage[i]);
       }
     }
+    
+    console.log(`Using ${ionData.length} points for ion current fitting (V < ${ionSaturationVoltage} V)`);
     
     clFit = fitCLModel(ionVoltages, ionData, VpNew);
     
@@ -144,6 +147,7 @@ export const performFullAnalysis = (voltage, current) => {
     iElectronFit: iCurrentToAnalyze,
     eedfData: eedfData,
     dIdV: gradient(savgolFilter(current), voltage),
-    iterationHistory: iterationHistory
+    iterationHistory: iterationHistory,
+    ionSaturationVoltage: ionSaturationVoltage
   };
 };
