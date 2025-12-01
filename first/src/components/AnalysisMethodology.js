@@ -29,7 +29,7 @@ const AnalysisMethodology = () => {
             <div className="border-l-4 border-red-500 pl-4">
               <h4 className="font-bold text-lg mb-2 text-red-700">1️⃣ 이온 전류 피팅 (Ion Current Fitting)</h4>
               <div className="bg-red-50 p-4 rounded-lg mb-3">
-                <p className="font-semibold text-red-900 mb-2">📐 Chen-Luhmann (CL) Model</p>
+                <p className="font-semibold text-red-900 mb-2">📐 CL Model</p>
                 <div className="font-mono text-sm bg-white p-3 rounded border border-red-200 mb-2">
                   I<sub>ion</sub>(V) = I<sub>sat</sub> × [1 + a × |V<sub>p</sub> - V|<sup>0.75</sup> / T<sub>e</sub><sup>0.75</sup>]
                 </div>
