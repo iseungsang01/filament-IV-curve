@@ -1,6 +1,6 @@
 // ============================================
-// src/pages/AlgorithmPage.js
-// 알고리즘 설명 페이지
+// src/pages/AlgorithmPage.js (개선 버전)
+// Child-Langmuir 모델 및 개선된 알고리즘 설명 추가
 // ============================================
 import React, { useState } from 'react';
 import { useAnalysis } from '../context/AnalysisContext';
@@ -38,10 +38,20 @@ export default function AlgorithmPage() {
             <h3 style={styles.cardTitle}>Overview</h3>
           </div>
           <p style={styles.text}>
-            This tool analyzes Langmuir probe I-V characteristics using a multi-step iterative algorithm
-            to extract plasma parameters: <strong>Plasma Potential (Vp)</strong>, <strong>Electron Temperature (Te)</strong>,
+            This tool uses an <strong>improved iterative algorithm</strong> combining Child-Langmuir ion current modeling
+            with dual-region linear regression for precise extraction of plasma parameters: 
+            <strong>Plasma Potential (Vp)</strong>, <strong>Electron Temperature (Te)</strong>,
             and <strong>Ion/Electron Densities (ni, ne)</strong>.
           </p>
+          <div style={styles.infoBox}>
+            <strong>🔬 Key Improvements:</strong>
+            <ul style={styles.list}>
+              <li>Child-Langmuir model for ion saturation current (a=1.02)</li>
+              <li>Dual-region (transition + saturation) linear regression for Vp/Te</li>
+              <li>Error propagation for all fitted parameters</li>
+              <li>Improved density calculation coefficients (0.61 for ions)</li>
+            </ul>
+          </div>
         </div>
         
         {/* Process Flow */}
@@ -54,10 +64,12 @@ export default function AlgorithmPage() {
           <div style={styles.flowDiagram}>
             {[
               { num: 1, title: 'Data Preprocessing', desc: 'Sort and validate I-V data' },
-              { num: 2, title: 'Initial Estimation', desc: 'Estimate Vp, Te, Isat, Ies' },
-              { num: 3, title: 'Iterative Optimization', desc: 'Refine Vp using gradient descent' },
-              { num: 4, title: 'Density Calculation', desc: 'Compute ni and ne from currents' },
-              { num: 5, title: 'Validation', desc: 'Check physical validity and quasineutrality' }
+              { num: 2, title: 'Initial Estimation', desc: 'Estimate Vp, Isat, Ies using dI/dV' },
+              { num: 3, title: 'Ion Current Modeling', desc: 'Apply Child-Langmuir model' },
+              { num: 4, title: 'Dual-Region Fitting', desc: 'Extract Vp/Te from line intersections' },
+              { num: 5, title: 'Iterative Refinement', desc: 'Converge Vp and Te with damping' },
+              { num: 6, title: 'Density Calculation', desc: 'Compute ni and ne with error bars' },
+              { num: 7, title: 'Validation', desc: 'Check quasineutrality and physical ranges' }
             ].map((step, idx) => (
               <React.Fragment key={idx}>
                 <div style={styles.flowStep}>
@@ -67,7 +79,7 @@ export default function AlgorithmPage() {
                     <div style={styles.flowDesc}>{step.desc}</div>
                   </div>
                 </div>
-                {idx < 4 && <div style={styles.flowArrow}>↓</div>}
+                {idx < 6 && <div style={styles.flowArrow}>↓</div>}
               </React.Fragment>
             ))}
           </div>
@@ -76,120 +88,151 @@ export default function AlgorithmPage() {
         {/* Detailed Algorithms */}
         <Section
           icon={<Code size={24} color="#10B981" />}
-          title="Step 1: Data Preprocessing"
+          title="Step 1-2: Initial Parameter Estimation"
           expanded={expandedSections.step1}
           onToggle={() => toggleSection('step1')}
         >
-          <h4 style={styles.subTitle}>Purpose</h4>
-          <p style={styles.text}>
-            Ensure data is properly sorted and clean for analysis.
-          </p>
-          
-          <h4 style={styles.subTitle}>Process</h4>
-          <ol style={styles.list}>
-            <li>Pair voltage and current data</li>
-            <li>Sort by voltage in ascending order</li>
-            <li>Remove any invalid data points (NaN, Infinity)</li>
-          </ol>
-          
-          <div style={styles.codeBlock}>
-            <code>{`voltage-current pairs → sort by voltage → clean data`}</code>
-          </div>
-        </Section>
-        
-        <Section
-          icon={<Code size={24} color="#10B981" />}
-          title="Step 2: Initial Parameter Estimation"
-          expanded={expandedSections.step2}
-          onToggle={() => toggleSection('step2')}
-        >
           <h4 style={styles.subTitle}>A. Ion Saturation Current (Isat)</h4>
           <p style={styles.text}>
-            <strong>Physical Meaning:</strong> Current when probe is at low voltage (ions absorbed)
-          </p>
-          <p style={styles.text}>
-            <strong>Method:</strong> Average of lowest 20% voltage region
+            Average current in the lowest 20% voltage region (most negative voltages).
           </p>
           <div style={styles.formula}>
-            I<sub>sat</sub> = Average(I) for V in [V<sub>min</sub>, V<sub>min</sub> + 20%]
+            I<sub>sat</sub> = Average(|I|) for V in [V<sub>min</sub>, V<sub>min</sub> + 20%]
           </div>
           
           <h4 style={styles.subTitle}>B. Electron Saturation Current (Ies)</h4>
           <p style={styles.text}>
-            <strong>Physical Meaning:</strong> Current when probe is at high voltage (electrons attracted)
-          </p>
-          <p style={styles.text}>
-            <strong>Method:</strong> Average of highest 20% voltage region
+            Average current in the highest 20% voltage region.
           </p>
           <div style={styles.formula}>
             I<sub>es</sub> = Average(I) for V in [V<sub>max</sub> - 20%, V<sub>max</sub>]
           </div>
           
-          <h4 style={styles.subTitle}>C. Plasma Potential (Vp)</h4>
+          <h4 style={styles.subTitle}>C. Initial Plasma Potential (Vp)</h4>
           <p style={styles.text}>
-            <strong>Physical Meaning:</strong> Voltage where current derivative is maximum
-          </p>
-          <p style={styles.text}>
-            <strong>Method:</strong> Find maximum of dI/dV using central difference
+            Voltage where |dI/dV| is maximum (using central difference method).
           </p>
           <div style={styles.formula}>
             dI/dV = (I[i+2] - I[i-2]) / (V[i+2] - V[i-2])
             <br />
-            V<sub>p</sub> = V where |dI/dV| is maximum
-          </div>
-          
-          <h4 style={styles.subTitle}>D. Electron Temperature (Te)</h4>
-          <p style={styles.text}>
-            <strong>Physical Meaning:</strong> Average kinetic energy of electrons (in eV)
-          </p>
-          <p style={styles.text}>
-            <strong>Method:</strong> Linear regression of ln(I) vs V in transition region (Vp ± 5V)
-          </p>
-          <div style={styles.formula}>
-            ln(I) = ln(I₀) + (e/k<sub>B</sub>T<sub>e</sub>) × V
-            <br />
-            T<sub>e</sub> [eV] = 1 / slope
-          </div>
-          
-          <div style={styles.infoBox}>
-            <strong>⚠️ Note:</strong> Te is constrained to 0.5-20 eV for physical validity
+            V<sub>p,initial</sub> = V where |dI/dV| is maximum
           </div>
         </Section>
         
         <Section
           icon={<Cpu size={24} color="#EC4899" />}
-          title="Step 3: Iterative Optimization"
+          title="Step 3: Child-Langmuir Ion Current Model"
           expanded={expandedSections.step3}
           onToggle={() => toggleSection('step3')}
         >
-          <h4 style={styles.subTitle}>Purpose</h4>
+          <h4 style={styles.subTitle}>Physical Background</h4>
           <p style={styles.text}>
-            Refine Vp to achieve better convergence using gradient descent algorithm.
+            In the ion saturation region (V &lt; Vp), the sheath around the probe expands,
+            collecting more ions. The Child-Langmuir law models this effect.
           </p>
           
-          <h4 style={styles.subTitle}>Algorithm</h4>
-          <div style={styles.codeBlock}>
-            <code>{`for iteration = 0 to maxIterations:
-    1. Recalculate Te at current Vp
-    2. Compute gradient around Vp
-    3. Update: Vp_new = Vp - learningRate × gradient
-    4. Check convergence: |Vp_new - Vp| < tolerance
-    5. If converged, break
-    
-Learning Rate: 0.1
-Tolerance: 1e-6 V`}</code>
+          <h4 style={styles.subTitle}>Model Equation</h4>
+          <div style={styles.formula}>
+            I<sub>ion</sub>(V) = I<sub>sat</sub> × [1 + a × ((V<sub>p</sub> - V) / T<sub>e</sub>)<sup>0.75</sup>]
+            <br /><br />
+            where:
+            <br />
+            • a = 1.02 (sheath expansion coefficient, empirical)
+            <br />
+            • V<sub>p</sub> = plasma potential
+            <br />
+            • T<sub>e</sub> = electron temperature (in eV)
           </div>
           
           <div style={styles.infoBox}>
-            <strong>💡 Tip:</strong> Typical convergence occurs in 10-50 iterations
+            <strong>💡 Key Point:</strong> The coefficient a=1.02 is based on standard probe theory
+            and accounts for the sheath geometry effect. This is more accurate than simple linear models.
           </div>
         </Section>
         
         <Section
           icon={<Activity size={24} color="#7C3AED" />}
-          title="Step 4: Density Calculation"
+          title="Step 4: Dual-Region Linear Regression for Vp/Te"
           expanded={expandedSections.step4}
           onToggle={() => toggleSection('step4')}
+        >
+          <h4 style={styles.subTitle}>Method Overview</h4>
+          <p style={styles.text}>
+            This is the <strong>most critical improvement</strong>. Instead of fitting a single region,
+            we fit TWO separate linear regions in log(I<sub>e</sub>) vs V space and find their intersection.
+          </p>
+          
+          <h4 style={styles.subTitle}>Step-by-Step Process</h4>
+          <ol style={styles.list}>
+            <li><strong>Separate electron current:</strong> I<sub>e</sub> = I<sub>total</sub> - I<sub>ion,model</sub></li>
+            <li><strong>Take logarithm:</strong> ln(I<sub>e</sub>) for positive currents only</li>
+            <li><strong>Define Region 1 (Transition):</strong> V<sub>p</sub> - 2V &lt; V &lt; V<sub>p</sub></li>
+            <li><strong>Define Region 2 (Saturation):</strong> V<sub>p</sub> + 0.5V &lt; V &lt; V<sub>p</sub> + 5V</li>
+            <li><strong>Linear fit each region:</strong>
+              <div style={styles.formula}>
+                Region 1: ln(I<sub>e</sub>) = m₁V + c₁
+                <br />
+                Region 2: ln(I<sub>e</sub>) = m₂V + c₂
+              </div>
+            </li>
+            <li><strong>Find intersection (Vp):</strong>
+              <div style={styles.formula}>
+                V<sub>p</sub> = (c₂ - c₁) / (m₁ - m₂)
+              </div>
+            </li>
+            <li><strong>Extract Te from slope:</strong>
+              <div style={styles.formula}>
+                T<sub>e</sub> = 1 / m₁ (in eV)
+              </div>
+            </li>
+            <li><strong>Extract Ies:</strong>
+              <div style={styles.formula}>
+                I<sub>es</sub> = exp(m₁V<sub>p</sub> + c₁)
+              </div>
+            </li>
+          </ol>
+          
+          <div style={styles.warningBox}>
+            <strong>⚠️ Why Two Regions?</strong>
+            <ul style={styles.list}>
+              <li>Transition region: steep slope → sensitive to Te</li>
+              <li>Saturation region: flat slope → marks true electron saturation</li>
+              <li>Intersection = physical definition of Vp</li>
+            </ul>
+          </div>
+        </Section>
+        
+        <Section
+          icon={<Cpu size={24} color="#EF4444" />}
+          title="Step 5: Iterative Refinement"
+          expanded={expandedSections.step5}
+          onToggle={() => toggleSection('step5')}
+        >
+          <h4 style={styles.subTitle}>Convergence Algorithm</h4>
+          <div style={styles.codeBlock}>
+            <code>{`for iteration = 0 to maxIterations:
+    1. Estimate Vp/Te using dual-region method
+    2. Update with damping factor (0.6):
+       Vp_new = 0.6 × Vp_old + 0.4 × Vp_estimated
+       Te_new = 0.6 × Te_old + 0.4 × Te_estimated
+    3. Check convergence: |Vp_new - Vp_old| < tolerance
+    4. If converged, break
+    
+Typical convergence: 10-30 iterations
+Default tolerance: 1e-6 V`}</code>
+          </div>
+          
+          <div style={styles.infoBox}>
+            <strong>💡 Damping Factor:</strong> The 0.6/0.4 ratio prevents oscillations
+            and ensures smooth convergence, especially for noisy data.
+          </div>
+        </Section>
+        
+        <Section
+          icon={<Activity size={24} color="#10B981" />}
+          title="Step 6: Density Calculation with Error Propagation"
+          expanded={expandedSections.step6}
+          onToggle={() => toggleSection('step6')}
         >
           <h4 style={styles.subTitle}>A. Ion Density (ni)</h4>
           <div style={styles.formula}>
@@ -201,7 +244,12 @@ Tolerance: 1e-6 V`}</code>
             <br />
             • A<sub>p</sub> = 2πr × L [probe surface area]
             <br />
-            • 0.61 = Bohm sheath coefficient
+            • 0.61 = Bohm sheath coefficient (improved from 0.6)
+          </div>
+          
+          <p style={styles.text}><strong>Error propagation:</strong></p>
+          <div style={styles.formula}>
+            δn<sub>i</sub> / n<sub>i</sub> = √[(δI<sub>sat</sub>/I<sub>sat</sub>)² + (0.5 × δT<sub>e</sub>/T<sub>e</sub>)²]
           </div>
           
           <h4 style={styles.subTitle}>B. Electron Density (ne)</h4>
@@ -215,6 +263,11 @@ Tolerance: 1e-6 V`}</code>
             • 0.25 = thermal equilibrium coefficient
           </div>
           
+          <p style={styles.text}><strong>Error propagation:</strong></p>
+          <div style={styles.formula}>
+            δn<sub>e</sub> / n<sub>e</sub> = √[(δI<sub>es</sub>/I<sub>es</sub>)² + (0.5 × δT<sub>e</sub>/T<sub>e</sub>)²]
+          </div>
+          
           <h4 style={styles.subTitle}>Physical Constants</h4>
           <ul style={styles.list}>
             <li>e = 1.602 × 10⁻¹⁹ C (elementary charge)</li>
@@ -225,9 +278,9 @@ Tolerance: 1e-6 V`}</code>
         
         <Section
           icon={<Activity size={24} color="#EF4444" />}
-          title="Step 5: Validation & Quasineutrality"
-          expanded={expandedSections.step5}
-          onToggle={() => toggleSection('step5')}
+          title="Step 7: Validation & Quasineutrality"
+          expanded={expandedSections.step7}
+          onToggle={() => toggleSection('step7')}
         >
           <h4 style={styles.subTitle}>Density Range Check</h4>
           <p style={styles.text}>
@@ -264,41 +317,51 @@ Tolerance: 1e-6 V`}</code>
           </div>
         </Section>
         
-        {/* Error Estimation */}
+        {/* Comparison Table */}
         <div style={styles.card}>
           <div style={styles.cardHeader}>
             <Activity size={24} color="#F59E0B" />
-            <h3 style={styles.cardTitle}>Error Estimation</h3>
+            <h3 style={styles.cardTitle}>Algorithm Comparison</h3>
           </div>
           
           <table style={styles.table}>
             <thead>
               <tr>
-                <th>Parameter</th>
-                <th>Error Estimate</th>
-                <th>Typical Value</th>
+                <th>Feature</th>
+                <th>Previous Version</th>
+                <th>Improved Version</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>Vp</td>
-                <td>8% of Te</td>
-                <td>±0.2 V</td>
+                <td>Ion Current Model</td>
+                <td>Simple average</td>
+                <td>Child-Langmuir (a=1.02)</td>
               </tr>
               <tr>
-                <td>Te</td>
-                <td>15% of Te</td>
-                <td>±0.3 eV</td>
+                <td>Vp Estimation</td>
+                <td>dI/dV maximum only</td>
+                <td>Dual-region line intersection</td>
               </tr>
               <tr>
-                <td>ni, ne</td>
-                <td>20% of density</td>
-                <td>±2×10¹⁶ m⁻³</td>
+                <td>Te Estimation</td>
+                <td>Single region fit</td>
+                <td>Transition region slope</td>
               </tr>
               <tr>
-                <td>Ratio</td>
-                <td>Propagated error</td>
-                <td>±0.05</td>
+                <td>Ion Density Coeff</td>
+                <td>0.60</td>
+                <td>0.61 (Bohm theory)</td>
+              </tr>
+              <tr>
+                <td>Error Estimation</td>
+                <td>Fixed percentages</td>
+                <td>Propagated from regression</td>
+              </tr>
+              <tr>
+                <td>Convergence</td>
+                <td>Gradient descent</td>
+                <td>Damped iterative refinement</td>
               </tr>
             </tbody>
           </table>
@@ -315,33 +378,17 @@ Tolerance: 1e-6 V`}</code>
             <h4 style={styles.troubleTitle}>❌ Problem: ni or ne is NaN</h4>
             <p style={styles.text}><strong>Possible Causes:</strong></p>
             <ul style={styles.list}>
-              <li>Insufficient voltage range (need both negative and positive voltages)</li>
+              <li>Insufficient voltage range (need -50V to +50V minimum)</li>
               <li>Incorrect probe radius or ion mass settings</li>
-              <li>Poor quality data (too much noise)</li>
-              <li>Data not covering saturation regions</li>
+              <li>Data doesn't cover both ion and electron saturation regions</li>
+              <li>Too much noise in the data</li>
             </ul>
             <p style={styles.text}><strong>Solutions:</strong></p>
             <ul style={styles.list}>
-              <li>Check data file format (2 columns: voltage, current)</li>
-              <li>Ensure voltage range: -50V to +50V minimum</li>
-              <li>Verify probe radius in Parameters page</li>
-              <li>Use smoothed/filtered data</li>
-            </ul>
-          </div>
-          
-          <div style={styles.troubleBox}>
-            <h4 style={styles.troubleTitle}>❌ Problem: Only 1 iteration, no convergence</h4>
-            <p style={styles.text}><strong>Possible Causes:</strong></p>
-            <ul style={styles.list}>
-              <li>Initial Vp estimate very close to true value (rare)</li>
-              <li>Learning rate too low</li>
-              <li>Tolerance too loose</li>
-            </ul>
-            <p style={styles.text}><strong>Solutions:</strong></p>
-            <ul style={styles.list}>
-              <li>This is usually not a problem if results look reasonable</li>
-              <li>Check console log (F12) for detailed iteration info</li>
-              <li>Reduce tolerance in Parameters page (e.g., 1e-7)</li>
+              <li>Verify data file has two columns: voltage, current</li>
+              <li>Check voltage range covers both negative and positive regions</li>
+              <li>Verify probe radius in Parameters page (typical: 0.3-1.0 mm)</li>
+              <li>Try smoothing/filtering raw data before upload</li>
             </ul>
           </div>
           
@@ -350,14 +397,16 @@ Tolerance: 1e-6 V`}</code>
             <p style={styles.text}><strong>Possible Causes:</strong></p>
             <ul style={styles.list}>
               <li>Non-Maxwellian electron distribution</li>
-              <li>Magnetic field effects not properly accounted for</li>
-              <li>Probe contamination or sheath expansion</li>
+              <li>Magnetic field effects not accounted for</li>
+              <li>Probe contamination or damage</li>
+              <li>Incorrect ion mass selection</li>
             </ul>
             <p style={styles.text}><strong>Solutions:</strong></p>
             <ul style={styles.list}>
               <li>Verify magnetic field strength in Parameters</li>
-              <li>Check if probe is clean and undamaged</li>
-              <li>Consider more advanced analysis methods</li>
+              <li>Check probe is clean and cylindrical</li>
+              <li>Confirm correct ion species (Ar, He, etc.)</li>
+              <li>Consider advanced analysis methods for non-ideal plasmas</li>
             </ul>
           </div>
         </div>

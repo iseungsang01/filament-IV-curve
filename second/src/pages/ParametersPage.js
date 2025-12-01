@@ -1,9 +1,10 @@
 // ============================================
-// src/pages/ParametersPage.js (Enhanced with tooltips)
+// src/pages/ParametersPage.js (개선 버전)
+// a 계수 1.02로 업데이트
 // ============================================
 import React, { useState } from 'react';
 import { useAnalysis } from '../context/AnalysisContext';
-import { ArrowLeft, ArrowRight, Settings, Info, HelpCircle, Book } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Settings, HelpCircle, Book } from 'lucide-react';
 
 export default function ParametersPage() {
   const { parameters, updateParameters, setCurrentPage, uploadedFiles } = useAnalysis();
@@ -128,7 +129,7 @@ export default function ParametersPage() {
               </label>
               <input
                 type="number"
-                value={localParams.aCoefficient}
+                value={1.02}
                 disabled
                 style={{ ...styles.input, backgroundColor: '#F7FAFC', cursor: 'not-allowed' }}
               />
@@ -138,8 +139,9 @@ export default function ParametersPage() {
                 <div style={styles.helpBox}>
                   <strong>Sheath Expansion Coefficient (a)</strong>
                   <p>
-                    Empirical parameter accounting for sheath expansion in electron saturation region.
-                    Fixed at 1.02 based on typical probe theory. Not user-adjustable.
+                    Empirical parameter (a=1.02) for Child-Langmuir model in ion saturation region.
+                    Accounts for sheath expansion when probe voltage is negative. 
+                    This value is based on standard probe theory and is not user-adjustable.
                   </p>
                 </div>
               )}
@@ -153,7 +155,8 @@ export default function ParametersPage() {
           <div>
             <strong>How does the algorithm work?</strong>
             <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem' }}>
-              The analysis uses a 5-step process: preprocessing → estimation → optimization → density calculation → validation.
+              The analysis uses an improved 5-step process with Child-Langmuir ion current modeling
+              and dual-region linear regression for precise Vp/Te extraction.
               Click "Documentation" above to learn more!
             </p>
           </div>
