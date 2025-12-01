@@ -1,26 +1,33 @@
 {
   "name": "plasma-electron-simulation",
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "description": "Monte Carlo simulation for electron collisions in Argon plasma",
+  "author": "Your Name",
+  "license": "MIT",
   "private": true,
   "dependencies": {
-    "@testing-library/dom": "^10.4.1",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.0",
-    "@testing-library/user-event": "^13.5.0",
-    "lucide-react": "^0.555.0",
-    "mathjs": "^15.1.0",
-    "papaparse": "^5.5.3",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
-    "recharts": "^3.5.1",
-    "web-vitals": "^2.1.4"
+    "lucide-react": "^0.263.1",
+    "recharts": "^2.10.3",
+    "web-vitals": "^3.5.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/user-event": "^13.5.0",
+    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "format": "prettier --write \"src/**/*.{js,jsx,json,css,md}\"",
+    "lint": "eslint src/**/*.{js,jsx}"
   },
   "eslintConfig": {
     "extends": [
@@ -39,5 +46,23 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  }
+  },
+  "keywords": [
+    "plasma",
+    "electron",
+    "monte-carlo",
+    "simulation",
+    "physics",
+    "argon",
+    "collision",
+    "ionization"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/plasma-electron-simulation.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/plasma-electron-simulation/issues"
+  },
+  "homepage": "."
 }

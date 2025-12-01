@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, Play, BarChart3, Settings, Info, Download, AlertCircle } from 'lucide-react';
+import { runMonteCarloSimulation } from './simulation/electronSimulation';
+import { loadCSVData } from './utils/dataLoader';
 
 export default function PlasmaSimulationApp() {
   const [currentView, setCurrentView] = useState('intro');
@@ -10,52 +12,33 @@ export default function PlasmaSimulationApp() {
     plasmaVoltage: 15.0,
     numElectrons: 10000,
     chamberVolume: 0.001,
-    wallArea: 0.1
+    wallArea: 0.1,
+    timeStep: 1e-12,
+    maxCollisions: 100
   });
   const [isSimulating, setIsSimulating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState(null);
+  const [error, setError] = useState(null);
 
   // CSV 파일 업로드 핸들러
-  const handleFileUpload = (event) => {
+  const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target.result;
-      const lines = text.split('\n');
-      const headers = lines[0].split(',');
-      
-      const data = {
-        headers,
-        energy: [],
-        sigma_1s: [],
-        sigma_2p: [],
-        sigma_high: [],
-        sigma_iz: []
-      };
-
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',');
-        if (values.length >= 5) {
-          data.energy.push(parseFloat(values[0]));
-          data.sigma_1s.push(parseFloat(values[1]));
-          data.sigma_2p.push(parseFloat(values[2]));
-          data.sigma_high.push(parseFloat(values[3]));
-          data.sigma_iz.push(parseFloat(values[4]));
-        }
-      }
-
+    try {
+      const data = await loadCSVData(file);
       setCsvData(data);
+      setError(null);
       alert('✅ Cross Section 데이터가 성공적으로 로드되었습니다!');
-    };
-
-    reader.readAsText(file);
+    } catch (err) {
+      setError('CSV 파일 로드 중 오류가 발생했습니다: ' + err.message);
+      alert('❌ CSV 파일 로드 실패: ' + err.message);
+    }
   };
 
-  // 시뮬레이션 실행 (간단한 데모)
-  const runSimulation = () => {
+  // 시뮬레이션 실행
+  const runSimulation = async () => {
     if (!csvData) {
       alert('⚠️ 먼저 Cross Section CSV 파일을 업로드해주세요!');
       return;
@@ -63,41 +46,37 @@ export default function PlasmaSimulationApp() {
 
     setIsSimulating(true);
     setProgress(0);
+    setError(null);
 
-    // 시뮬레이션 시뮬레이션 (실제로는 여기서 Monte Carlo 로직 실행)
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsSimulating(false);
-          
-          // 더미 결과 생성
-          const dummyResults = generateDummyResults(simulationParams.numElectrons);
-          setResults(dummyResults);
-          setCurrentView('results');
-          return 100;
-        }
-        return prev + 5;
-      });
-    }, 100);
+    try {
+      const simulationResults = await runMonteCarloSimulation(
+        csvData,
+        simulationParams,
+        (p) => setProgress(p)
+      );
+
+      setResults(simulationResults);
+      setCurrentView('results');
+    } catch (err) {
+      setError('시뮬레이션 중 오류가 발생했습니다: ' + err.message);
+      alert('❌ 시뮬레이션 실패: ' + err.message);
+    } finally {
+      setIsSimulating(false);
+    }
   };
 
-  // 더미 결과 생성 함수
-  const generateDummyResults = (n) => {
-    const ionizations = [];
-    for (let i = 0; i < n; i++) {
-      // 포아송 분포 근사 (평균 2-3개)
-      const count = Math.floor(Math.random() * 5) + 1;
-      ionizations.push(count);
-    }
+  // 결과 다운로드
+  const downloadResults = () => {
+    if (!results) return;
 
-    return {
-      ionizations,
-      average: ionizations.reduce((a, b) => a + b, 0) / ionizations.length,
-      max: Math.max(...ionizations),
-      min: Math.min(...ionizations),
-      survival: Math.random() * 0.3 + 0.6 // 60-90%
-    };
+    const dataStr = JSON.stringify(results, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `simulation_results_${Date.now()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -153,6 +132,19 @@ export default function PlasmaSimulationApp() {
           </div>
         </div>
       </nav>
+
+      {/* Error Display */}
+      {error && (
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="bg-red-500/20 border border-red-400/50 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-red-200">오류 발생</p>
+              <p className="text-sm text-red-300 mt-1">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -211,7 +203,7 @@ export default function PlasmaSimulationApp() {
 
         {currentView === 'simulation' && (
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Left Panel - File Upload & Parameters */}
+            {/* Left Panel */}
             <div className="lg:col-span-1 space-y-6">
               {/* File Upload */}
               <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
@@ -278,8 +270,8 @@ export default function PlasmaSimulationApp() {
                   <div>
                     <label className="block text-sm mb-2">가스 밀도 (m⁻³)</label>
                     <input
-                      type="number"
-                      value={simulationParams.gasDensity}
+                      type="text"
+                      value={simulationParams.gasDensity.toExponential(2)}
                       onChange={(e) => setSimulationParams({
                         ...simulationParams,
                         gasDensity: parseFloat(e.target.value)
@@ -317,10 +309,10 @@ export default function PlasmaSimulationApp() {
               </div>
             </div>
 
-            {/* Right Panel - Simulation Control */}
+            {/* Right Panel */}
             <div className="lg:col-span-2">
               <div className="bg-white/10 backdrop-blur-md rounded-xl p-8 border border-white/20 h-full flex flex-col items-center justify-center">
-                {!isSimulating && !results && (
+                {!isSimulating && (
                   <div className="text-center">
                     <div className="bg-gradient-to-r from-blue-500 to-indigo-500 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
                       <Play className="w-12 h-12" />
@@ -348,9 +340,7 @@ export default function PlasmaSimulationApp() {
                   <div className="text-center w-full max-w-md">
                     <div className="relative w-32 h-32 mx-auto mb-6">
                       <div className="absolute inset-0 border-8 border-blue-500/30 rounded-full"></div>
-                      <div
-                        className="absolute inset-0 border-8 border-blue-500 rounded-full border-t-transparent animate-spin"
-                      ></div>
+                      <div className="absolute inset-0 border-8 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
                       <div className="absolute inset-0 flex items-center justify-center">
                         <span className="text-2xl font-bold">{progress}%</span>
                       </div>
@@ -378,36 +368,37 @@ export default function PlasmaSimulationApp() {
             <div className="grid md:grid-cols-4 gap-4">
               <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 backdrop-blur-md rounded-xl p-6 border border-blue-400/30">
                 <p className="text-sm text-white/70 mb-1">평균 이온화 수</p>
-                <p className="text-3xl font-bold">{results.average.toFixed(2)}</p>
+                <p className="text-3xl font-bold">{results.avgIonizations.toFixed(2)}</p>
               </div>
               <div className="bg-gradient-to-br from-green-500/20 to-green-600/20 backdrop-blur-md rounded-xl p-6 border border-green-400/30">
-                <p className="text-sm text-white/70 mb-1">최대값</p>
-                <p className="text-3xl font-bold">{results.max}</p>
+                <p className="text-sm text-white/70 mb-1">최대 이온화</p>
+                <p className="text-3xl font-bold">{results.maxIonizations}</p>
               </div>
               <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 backdrop-blur-md rounded-xl p-6 border border-purple-400/30">
-                <p className="text-sm text-white/70 mb-1">최소값</p>
-                <p className="text-3xl font-bold">{results.min}</p>
+                <p className="text-sm text-white/70 mb-1">평균 충돌 수</p>
+                <p className="text-3xl font-bold">{results.avgCollisions.toFixed(1)}</p>
               </div>
               <div className="bg-gradient-to-br from-orange-500/20 to-orange-600/20 backdrop-blur-md rounded-xl p-6 border border-orange-400/30">
-                <p className="text-sm text-white/70 mb-1">생존율</p>
-                <p className="text-3xl font-bold">{(results.survival * 100).toFixed(1)}%</p>
+                <p className="text-sm text-white/70 mb-1">벽 흡수율</p>
+                <p className="text-3xl font-bold">{(results.wallAbsorptionRate * 100).toFixed(1)}%</p>
               </div>
             </div>
 
             {/* Histogram */}
             <div className="bg-white/10 backdrop-blur-md rounded-xl p-8 border border-white/20">
               <h2 className="text-xl font-bold mb-6">이온화 분포 히스토그램</h2>
-              <div className="h-64 bg-white/5 rounded-lg flex items-end justify-around p-4">
-                {Array.from({ length: results.max + 1 }, (_, i) => {
-                  const count = results.ionizations.filter(x => x === i).length;
-                  const height = (count / results.ionizations.length) * 100;
+              <div className="h-64 bg-white/5 rounded-lg flex items-end justify-around p-4 gap-1">
+                {results.ionizationDistribution.map((count, index) => {
+                  const maxCount = Math.max(...results.ionizationDistribution);
+                  const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
                   return (
-                    <div key={i} className="flex flex-col items-center flex-1">
+                    <div key={index} className="flex flex-col items-center flex-1 min-w-0">
+                      <div className="text-xs text-white/60 mb-1">{count}</div>
                       <div
                         className="w-full bg-gradient-to-t from-blue-500 to-indigo-500 rounded-t transition-all"
-                        style={{ height: `${height}%` }}
+                        style={{ height: `${height}%`, minHeight: count > 0 ? '2px' : '0' }}
                       ></div>
-                      <span className="text-xs mt-2">{i}</span>
+                      <span className="text-xs mt-2">{index}</span>
                     </div>
                   );
                 })}
@@ -423,6 +414,7 @@ export default function PlasmaSimulationApp() {
                 새 시뮬레이션
               </button>
               <button
+                onClick={downloadResults}
                 className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2"
               >
                 <Download className="w-5 h-5" />
