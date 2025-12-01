@@ -1,10 +1,14 @@
+// ============================================
+// src/pages/ParametersPage.js (Enhanced with tooltips)
+// ============================================
 import React, { useState } from 'react';
 import { useAnalysis } from '../context/AnalysisContext';
-import { ArrowLeft, ArrowRight, Settings, Info } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Settings, Info, HelpCircle, Book } from 'lucide-react';
 
 export default function ParametersPage() {
   const { parameters, updateParameters, setCurrentPage, uploadedFiles } = useAnalysis();
   const [localParams, setLocalParams] = useState(parameters);
+  const [showHelp, setShowHelp] = useState({});
   
   const handleChange = (key, value) => {
     setLocalParams(prev => ({ ...prev, [key]: parseFloat(value) || 0 }));
@@ -15,6 +19,10 @@ export default function ParametersPage() {
     setCurrentPage('analysis');
   };
   
+  const toggleHelp = (key) => {
+    setShowHelp(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+  
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -23,6 +31,10 @@ export default function ParametersPage() {
           <span>Back</span>
         </button>
         <h2 style={styles.title}>Step 2/5: Set Parameters</h2>
+        <button style={styles.helpButton} onClick={() => setCurrentPage('algorithm')}>
+          <Book size={20} />
+          <span>Documentation</span>
+        </button>
       </div>
       
       <div style={styles.content}>
@@ -34,56 +46,41 @@ export default function ParametersPage() {
           </div>
           
           <div style={styles.paramGrid}>
-            <div style={styles.paramItem}>
-              <label style={styles.label}>
-                Probe Radius (m)
-                <span style={styles.tooltip} title="Cylindrical probe radius">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input
-                type="number"
-                step="0.001"
-                value={localParams.probeRadius}
-                onChange={(e) => handleChange('probeRadius', e.target.value)}
-                style={styles.input}
-              />
-              <span style={styles.hint}>{(localParams.probeRadius * 1000).toFixed(1)} mm</span>
-            </div>
+            <ParamInput
+              label="Probe Radius (m)"
+              value={localParams.probeRadius}
+              onChange={(val) => handleChange('probeRadius', val)}
+              step="0.0001"
+              hint={`${(localParams.probeRadius * 1000).toFixed(2)} mm`}
+              helpKey="probeRadius"
+              helpText="Radius of the cylindrical Langmuir probe. Typical values: 0.1-1.0 mm. Affects the probe surface area calculation for density."
+              showHelp={showHelp.probeRadius}
+              onToggleHelp={() => toggleHelp('probeRadius')}
+            />
             
-            <div style={styles.paramItem}>
-              <label style={styles.label}>
-                Ion Mass (kg)
-                <span style={styles.tooltip} title="Ar: 6.63e-26, He: 6.65e-27">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input
-                type="number"
-                step="1e-27"
-                value={localParams.ionMass}
-                onChange={(e) => handleChange('ionMass', e.target.value)}
-                style={styles.input}
-              />
-              <span style={styles.hint}>Ar: 6.63e-26 kg</span>
-            </div>
+            <ParamInput
+              label="Ion Mass (kg)"
+              value={localParams.ionMass}
+              onChange={(val) => handleChange('ionMass', val)}
+              step="1e-27"
+              hint="Ar: 6.63×10⁻²⁶ kg, He: 6.65×10⁻²⁷ kg"
+              helpKey="ionMass"
+              helpText="Mass of the plasma ions. Common gases: Argon (6.63e-26 kg), Helium (6.65e-27 kg), Hydrogen (1.67e-27 kg). Used to calculate ion sound speed."
+              showHelp={showHelp.ionMass}
+              onToggleHelp={() => toggleHelp('ionMass')}
+            />
             
-            <div style={styles.paramItem}>
-              <label style={styles.label}>
-                Magnetic Field (T)
-                <span style={styles.tooltip} title="Applied magnetic field strength">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input
-                type="number"
-                step="0.001"
-                value={localParams.magneticField}
-                onChange={(e) => handleChange('magneticField', e.target.value)}
-                style={styles.input}
-              />
-              <span style={styles.hint}>{(localParams.magneticField * 10000).toFixed(0)} Gauss</span>
-            </div>
+            <ParamInput
+              label="Magnetic Field (T)"
+              value={localParams.magneticField}
+              onChange={(val) => handleChange('magneticField', val)}
+              step="0.001"
+              hint={`${(localParams.magneticField * 10000).toFixed(0)} Gauss`}
+              helpKey="magneticField"
+              helpText="Applied external magnetic field strength. Affects electron/ion trajectories. 1 Tesla = 10,000 Gauss. For unmagnetized plasmas, use 0."
+              showHelp={showHelp.magneticField}
+              onToggleHelp={() => toggleHelp('magneticField')}
+            />
           </div>
         </div>
         
@@ -95,52 +92,70 @@ export default function ParametersPage() {
           </div>
           
           <div style={styles.paramGrid}>
-            <div style={styles.paramItem}>
-              <label style={styles.label}>
-                Max Iterations
-                <span style={styles.tooltip} title="Maximum number of iterations for convergence">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input
-                type="number"
-                value={localParams.maxIterations}
-                onChange={(e) => handleChange('maxIterations', e.target.value)}
-                style={styles.input}
-              />
-            </div>
+            <ParamInput
+              label="Max Iterations"
+              value={localParams.maxIterations}
+              onChange={(val) => handleChange('maxIterations', val)}
+              step="1"
+              hint="More iterations = better accuracy"
+              helpKey="maxIterations"
+              helpText="Maximum number of optimization iterations. Typical: 50-200. Algorithm stops early if convergence is reached. Higher values ensure better Vp accuracy but take longer."
+              showHelp={showHelp.maxIterations}
+              onToggleHelp={() => toggleHelp('maxIterations')}
+            />
             
-            <div style={styles.paramItem}>
-              <label style={styles.label}>
-                Tolerance
-                <span style={styles.tooltip} title="Convergence criterion for Vp">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input
-                type="number"
-                step="1e-6"
-                value={localParams.tolerance}
-                onChange={(e) => handleChange('tolerance', e.target.value)}
-                style={styles.input}
-              />
-            </div>
+            <ParamInput
+              label="Tolerance"
+              value={localParams.tolerance}
+              onChange={(val) => handleChange('tolerance', val)}
+              step="1e-7"
+              hint="Lower = more precise"
+              helpKey="tolerance"
+              helpText="Convergence criterion for Vp (in Volts). Algorithm stops when |Vp_new - Vp_old| < tolerance. Typical: 1e-6 to 1e-8. Smaller values = more precise but slower."
+              showHelp={showHelp.tolerance}
+              onToggleHelp={() => toggleHelp('tolerance')}
+            />
             
             <div style={styles.paramItem}>
               <label style={styles.label}>
                 a Coefficient
-                <span style={styles.tooltip} title="Sheath expansion coefficient (fixed)">
-                  <Info size={14} />
-                </span>
+                <button
+                  style={styles.infoButton}
+                  onClick={() => toggleHelp('aCoefficient')}
+                >
+                  <HelpCircle size={14} />
+                </button>
               </label>
               <input
                 type="number"
                 value={localParams.aCoefficient}
                 disabled
-                style={{ ...styles.input, backgroundColor: '#F7FAFC' }}
+                style={{ ...styles.input, backgroundColor: '#F7FAFC', cursor: 'not-allowed' }}
               />
-              <span style={styles.hint}>Fixed value</span>
+              <span style={styles.hint}>Fixed sheath expansion coefficient</span>
+              
+              {showHelp.aCoefficient && (
+                <div style={styles.helpBox}>
+                  <strong>Sheath Expansion Coefficient (a)</strong>
+                  <p>
+                    Empirical parameter accounting for sheath expansion in electron saturation region.
+                    Fixed at 1.02 based on typical probe theory. Not user-adjustable.
+                  </p>
+                </div>
+              )}
             </div>
+          </div>
+        </div>
+        
+        {/* Algorithm Info Banner */}
+        <div style={styles.infoBanner}>
+          <HelpCircle size={24} />
+          <div>
+            <strong>How does the algorithm work?</strong>
+            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem' }}>
+              The analysis uses a 5-step process: preprocessing → estimation → optimization → density calculation → validation.
+              Click "Documentation" above to learn more!
+            </p>
           </div>
         </div>
         
@@ -165,6 +180,37 @@ export default function ParametersPage() {
   );
 }
 
+// Parameter Input Component with Help
+function ParamInput({ label, value, onChange, step, hint, helpText, helpKey, showHelp, onToggleHelp }) {
+  return (
+    <div style={styles.paramItem}>
+      <label style={styles.label}>
+        {label}
+        <button
+          style={styles.infoButton}
+          onClick={onToggleHelp}
+        >
+          <HelpCircle size={14} />
+        </button>
+      </label>
+      <input
+        type="number"
+        step={step}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={styles.input}
+      />
+      <span style={styles.hint}>{hint}</span>
+      
+      {showHelp && (
+        <div style={styles.helpBox}>
+          {helpText}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const styles = {
   container: {
     minHeight: '100vh',
@@ -176,7 +222,9 @@ const styles = {
     margin: '0 auto 2rem',
     display: 'flex',
     alignItems: 'center',
-    gap: '1rem'
+    justifyContent: 'space-between',
+    gap: '1rem',
+    flexWrap: 'wrap'
   },
   backButton: {
     display: 'flex',
@@ -189,10 +237,24 @@ const styles = {
     fontSize: '0.875rem',
     color: '#4A5568'
   },
+  helpButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.5rem 1rem',
+    backgroundColor: '#EEF2FF',
+    border: '1px solid #4F46E5',
+    borderRadius: '6px',
+    fontSize: '0.875rem',
+    color: '#4F46E5',
+    fontWeight: '600'
+  },
   title: {
     fontSize: '1.5rem',
     fontWeight: 'bold',
-    color: '#1A202C'
+    color: '#1A202C',
+    flex: 1,
+    textAlign: 'center'
   },
   content: {
     maxWidth: '1200px',
@@ -236,11 +298,17 @@ const styles = {
     color: '#4A5568',
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem'
+    justifyContent: 'space-between'
   },
-  tooltip: {
+  infoButton: {
+    padding: '0.25rem',
+    backgroundColor: 'transparent',
+    border: 'none',
     color: '#A0AEC0',
-    cursor: 'help'
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'color 0.2s'
   },
   input: {
     padding: '0.75rem',
@@ -252,6 +320,25 @@ const styles = {
   hint: {
     fontSize: '0.75rem',
     color: '#A0AEC0'
+  },
+  helpBox: {
+    marginTop: '0.5rem',
+    padding: '0.75rem',
+    backgroundColor: '#EEF2FF',
+    border: '2px solid #C7D2FE',
+    borderRadius: '6px',
+    fontSize: '0.875rem',
+    color: '#4C1D95',
+    lineHeight: '1.5'
+  },
+  infoBanner: {
+    display: 'flex',
+    gap: '1rem',
+    padding: '1.5rem',
+    backgroundColor: '#DBEAFE',
+    borderRadius: '12px',
+    border: '2px solid #93C5FD',
+    color: '#1E3A8A'
   },
   summary: {
     backgroundColor: '#EEF2FF',

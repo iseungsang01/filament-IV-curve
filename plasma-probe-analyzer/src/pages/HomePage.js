@@ -1,10 +1,10 @@
 // ============================================
 // src/pages/HomePage.js
-// 메인 홈페이지
+// 메인 홈페이지 (알고리즘 페이지 링크 추가)
 // ============================================
 import React from 'react';
 import { useAnalysis } from '../context/AnalysisContext';
-import { Upload, Settings, BarChart3, FileText, Zap } from 'lucide-react';
+import { Upload, Settings, BarChart3, FileText, Zap, Book, HelpCircle } from 'lucide-react';
 
 export default function HomePage() {
   const { setCurrentPage, resetAnalysis } = useAnalysis();
@@ -25,10 +25,24 @@ export default function HomePage() {
           Advanced I-V Curve Analysis for Langmuir Probe Diagnostics
         </p>
         
-        <button style={styles.startButton} onClick={handleStartNew}>
-          <Upload size={20} />
-          <span>Start New Analysis</span>
-        </button>
+        <div style={styles.buttonGroup}>
+          <button style={styles.startButton} onClick={handleStartNew}>
+            <Upload size={20} />
+            <span>Start New Analysis</span>
+          </button>
+          
+          <button style={styles.algorithmButton} onClick={() => setCurrentPage('algorithm')}>
+            <Book size={20} />
+            <span>Algorithm Documentation</span>
+          </button>
+        </div>
+        
+        <div style={styles.helpBanner}>
+          <HelpCircle size={20} />
+          <span>
+            New to this tool? Check the <strong>Algorithm Documentation</strong> to understand how it works!
+          </span>
+        </div>
       </div>
       
       <div style={styles.features}>
@@ -143,6 +157,13 @@ const styles = {
     marginBottom: '2rem',
     lineHeight: '1.6'
   },
+  buttonGroup: {
+    display: 'flex',
+    gap: '1rem',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    marginBottom: '1.5rem'
+  },
   startButton: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -156,6 +177,30 @@ const styles = {
     fontWeight: '600',
     boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
     transition: 'all 0.3s'
+  },
+  algorithmButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    padding: '1rem 2rem',
+    backgroundColor: 'white',
+    color: '#4F46E5',
+    border: '2px solid #4F46E5',
+    borderRadius: '12px',
+    fontSize: '1.125rem',
+    fontWeight: '600',
+    transition: 'all 0.3s'
+  },
+  helpBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    justifyContent: 'center',
+    padding: '1rem',
+    backgroundColor: '#EEF2FF',
+    borderRadius: '8px',
+    color: '#4C1D95',
+    fontSize: '0.875rem'
   },
   features: {
     maxWidth: '1200px',

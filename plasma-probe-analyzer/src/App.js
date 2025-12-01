@@ -1,6 +1,7 @@
 import React from 'react';
 import { AnalysisProvider, useAnalysis } from './context/AnalysisContext';
 import HomePage from './pages/HomePage';
+import AlgorithmPage from './pages/AlgorithmPage';
 import UploadPage from './pages/UploadPage';
 import ParametersPage from './pages/ParametersPage';
 import AnalysisPage from './pages/AnalysisPage';
@@ -16,6 +17,8 @@ function AppContent() {
     switch (currentPage) {
       case 'home':
         return <HomePage />;
+      case 'algorithm':
+        return <AlgorithmPage />;
       case 'upload':
         return <UploadPage />;
       case 'parameters':
