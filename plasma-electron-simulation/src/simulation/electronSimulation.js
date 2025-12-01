@@ -1,285 +1,287 @@
-// Monte Carlo 전자 시뮬레이션
-import { ARGON_DATA, SIMULATION_CONFIG, velocityFromEnergy, energyFromVelocity, PHYSICAL_CONSTANTS } from './constants';
-import { getCrossSections, getTotalCrossSection, selectCollisionType, getMeanFreePath } from './crossSections';
-import { getTimeToCollision, calculateCollisionFrequency } from './frequencies';
+/**
+ * Electron Monte Carlo Simulation
+ * 플라즈마에서 전자의 충돌 과정을 Monte Carlo 방법으로 시뮬레이션
+ */
+
+import { CONSTANTS, ARGON_PROPERTIES, SIMULATION_DEFAULTS } from './constants';
+import { calculateSecondaryElectronEnergy } from './bebModel';
 
 /**
- * 단일 전자 시뮬레이션
+ * 단일 전자 추적
+ * @param {number} initialEnergy - 초기 에너지 (eV)
+ * @param {Object} crossSectionData - 단면적 데이터 객체
+ * @param {Object} params - 시뮬레이션 파라미터
+ * @returns {Object} 전자 추적 결과
  */
-class ElectronTracker {
-  constructor(initialEnergy, gasDensity, csvData, params) {
-    this.energy = initialEnergy;
-    this.gasDensity = gasDensity;
-    this.csvData = csvData;
-    this.params = params;
-    
-    this.position = { x: 0, y: 0, z: 0 };
-    this.velocity = this.getRandomVelocity(initialEnergy);
-    
-    this.ionizations = 0;
-    this.collisions = 0;
-    this.totalTime = 0;
-    this.isActive = true;
-    
-    this.collisionHistory = [];
-  }
+export function traceElectron(initialEnergy, crossSectionData, params) {
+  const {
+    gasDensity,
+    plasmaVoltage,
+    chamberVolume,
+    wallArea
+  } = params;
   
-  getRandomVelocity(energy) {
-    const speed = velocityFromEnergy(energy);
-    const theta = Math.acos(2 * Math.random() - 1);
-    const phi = 2 * Math.PI * Math.random();
+  let energy = initialEnergy;
+  let position = { x: 0, y: 0, z: 0 };  // 초기 위치
+  let velocity = getVelocityFromEnergy(energy);
+  
+  const collisions = [];
+  let ionizationCount = 0;
+  let excitationCount = 0;
+  let totalDistance = 0;
+  let time = 0;
+  
+  const MAX_COLLISIONS = 1000;
+  const MIN_ENERGY = 0.1;  // eV
+  const MAX_TIME = 1e-6;   // 1 μs
+  
+  // 충돌 루프
+  for (let i = 0; i < MAX_COLLISIONS; i++) {
+    // 에너지가 너무 낮으면 중단
+    if (energy < MIN_ENERGY) {
+      break;
+    }
     
-    return {
-      x: speed * Math.sin(theta) * Math.cos(phi),
-      y: speed * Math.sin(theta) * Math.sin(phi),
-      z: speed * Math.cos(theta)
+    // 시간 제한
+    if (time > MAX_TIME) {
+      break;
+    }
+    
+    // 평균 자유 행로 계산
+    const mfp = crossSectionData.getMeanFreePath(energy, gasDensity);
+    
+    // 충돌까지의 거리 샘플링 (지수 분포)
+    const distance = -mfp * Math.log(Math.random());
+    totalDistance += distance;
+    
+    // 시간 증가
+    const v = getVelocityFromEnergy(energy);
+    time += distance / v;
+    
+    // 위치 업데이트 (간단히 1D로 근사)
+    position.z += distance;
+    
+    // 벽면 충돌 체크 (간단한 모델)
+    const chamberRadius = Math.sqrt(chamberVolume / Math.PI);
+    if (Math.abs(position.z) > chamberRadius) {
+      // 벽면에 흡수됨
+      break;
+    }
+    
+    // 충돌 유형 결정
+    const collisionType = crossSectionData.selectCollisionType(energy, Math.random());
+    
+    const collisionEvent = {
+      type: collisionType,
+      energyBefore: energy,
+      position: { ...position },
+      time: time
     };
-  }
-  
-  getSpeed() {
-    return Math.sqrt(
-      this.velocity.x ** 2 + 
-      this.velocity.y ** 2 + 
-      this.velocity.z ** 2
-    );
-  }
-  
-  updateEnergy() {
-    const speed = this.getSpeed();
-    this.energy = energyFromVelocity(speed);
-  }
-  
-  moveElectron(dt) {
-    this.position.x += this.velocity.x * dt;
-    this.position.y += this.velocity.y * dt;
-    this.position.z += this.velocity.z * dt;
-    this.totalTime += dt;
-  }
-  
-  checkWallCollision(chamberSize) {
-    const halfSize = chamberSize / 2;
     
-    if (Math.abs(this.position.x) > halfSize ||
-        Math.abs(this.position.y) > halfSize ||
-        Math.abs(this.position.z) > halfSize) {
-      
-      // 벽 충돌 - 흡수 확률
-      if (Math.random() < SIMULATION_CONFIG.WALL_ABSORPTION_PROBABILITY) {
-        this.isActive = false;
-        return true;
-      }
-      
-      // 반사
-      if (Math.abs(this.position.x) > halfSize) {
-        this.velocity.x *= -1;
-        this.position.x = Math.sign(this.position.x) * halfSize;
-      }
-      if (Math.abs(this.position.y) > halfSize) {
-        this.velocity.y *= -1;
-        this.position.y = Math.sign(this.position.y) * halfSize;
-      }
-      if (Math.abs(this.position.z) > halfSize) {
-        this.velocity.z *= -1;
-        this.position.z = Math.sign(this.position.z) * halfSize;
-      }
-      
-      return true;
-    }
-    
-    return false;
-  }
-  
-  performCollision() {
-    const crossSections = getCrossSections(this.energy, this.csvData);
-    const totalSigma = getTotalCrossSection(crossSections);
-    
-    if (totalSigma === 0) {
-      this.isActive = false;
-      return null;
-    }
-    
-    const collisionType = selectCollisionType(crossSections, Math.random());
-    this.collisions++;
-    
-    this.collisionHistory.push({
-      time: this.totalTime,
-      energy: this.energy,
-      type: collisionType
-    });
-    
+    // 충돌에 따른 에너지 손실 처리
     switch (collisionType) {
       case 'elastic':
-        this.handleElasticCollision();
+        // 탄성 충돌: 에너지 손실 작음 (전자-원자 질량비 고려)
+        const elasticLoss = calculateElasticEnergyLoss(energy);
+        energy -= elasticLoss;
         break;
+        
       case 'excitation_1s':
-        this.handleExcitation(ARGON_DATA.EXCITATION_1S);
+        // 1S 여기
+        energy -= 11.55;  // eV
+        excitationCount++;
         break;
+        
       case 'excitation_2p':
-        this.handleExcitation(ARGON_DATA.EXCITATION_2P);
+        // 2P 여기
+        energy -= 12.91;  // eV
+        excitationCount++;
         break;
+        
       case 'excitation_high':
-        this.handleExcitation(ARGON_DATA.EXCITATION_HIGH);
+        // 고준위 여기
+        energy -= 13.5;  // eV (평균)
+        excitationCount++;
         break;
+        
       case 'ionization':
-        this.handleIonization();
+        // 이온화
+        const ionizationEnergy = ARGON_PROPERTIES.IONIZATION_ENERGY;
+        
+        if (energy > ionizationEnergy) {
+          ionizationCount++;
+          
+          // 이차 전자 생성
+          const { primaryNew, secondary } = calculateSecondaryElectronEnergy(
+            energy, 
+            ionizationEnergy, 
+            Math.random()
+          );
+          
+          energy = primaryNew;
+          
+          collisionEvent.secondary = secondary;
+        } else {
+          energy = 0;
+        }
         break;
     }
     
-    return collisionType;
-  }
-  
-  handleElasticCollision() {
-    // 탄성 충돌 - 운동량 보존
-    const me = PHYSICAL_CONSTANTS.ELECTRON_MASS;
-    const mAr = PHYSICAL_CONSTANTS.ARGON_MASS;
+    collisionEvent.energyAfter = energy;
+    collisionEvent.energyLoss = collisionEvent.energyBefore - energy;
+    collisions.push(collisionEvent);
     
-    // 에너지 손실 (평균)
-    const energyLoss = 2 * me / mAr * this.energy;
-    this.energy = Math.max(0, this.energy - energyLoss);
-    
-    // 속도 방향 랜덤하게 변경
-    this.velocity = this.getRandomVelocity(this.energy);
-  }
-  
-  handleExcitation(excitationEnergy) {
-    this.energy -= excitationEnergy;
-    
-    if (this.energy < SIMULATION_CONFIG.MIN_ENERGY_THRESHOLD) {
-      this.isActive = false;
-      return;
+    // 에너지가 음수가 되면 중단
+    if (energy <= 0) {
+      break;
     }
-    
-    this.velocity = this.getRandomVelocity(this.energy);
   }
   
-  handleIonization() {
-    this.ionizations++;
-    this.energy -= ARGON_DATA.IONIZATION_ENERGY;
-    
-    if (this.energy < SIMULATION_CONFIG.MIN_ENERGY_THRESHOLD) {
-      this.isActive = false;
-      return;
-    }
-    
-    // 2차 전자 생성 (간단한 모델)
-    const secondaryEnergy = Math.random() * Math.min(this.energy * 0.5, 10);
-    this.energy -= secondaryEnergy;
-    
-    this.velocity = this.getRandomVelocity(this.energy);
-  }
-  
-  simulate() {
-    const maxCollisions = this.params.maxCollisions || SIMULATION_CONFIG.DEFAULT_MAX_COLLISIONS;
-    const chamberSize = Math.cbrt(this.params.chamberVolume);
-    
-    while (this.isActive && this.collisions < maxCollisions) {
-      // 에너지가 너무 낮으면 종료
-      if (this.energy < SIMULATION_CONFIG.MIN_ENERGY_THRESHOLD) {
-        this.isActive = false;
-        break;
-      }
-      
-      // 충돌 단면적 계산
-      const crossSections = getCrossSections(this.energy, this.csvData);
-      const totalSigma = getTotalCrossSection(crossSections);
-      
-      if (totalSigma === 0) {
-        this.isActive = false;
-        break;
-      }
-      
-      // 충돌 빈도 계산
-      const collisionFreq = calculateCollisionFrequency(this.energy, totalSigma, this.gasDensity);
-      
-      if (collisionFreq === 0) {
-        this.isActive = false;
-        break;
-      }
-      
-      // 다음 충돌까지의 시간
-      const timeToCollision = getTimeToCollision(collisionFreq, Math.random());
-      
-      // 전자 이동
-      this.moveElectron(timeToCollision);
-      
-      // 벽 충돌 체크
-      if (this.checkWallCollision(chamberSize)) {
-        if (!this.isActive) break;
-      }
-      
-      // 가스 충돌 수행
-      this.performCollision();
-    }
-    
-    return {
-      ionizations: this.ionizations,
-      collisions: this.collisions,
-      finalEnergy: this.energy,
-      totalTime: this.totalTime,
-      collisionHistory: this.collisionHistory
-    };
-  }
+  return {
+    initialEnergy,
+    finalEnergy: energy,
+    ionizationCount,
+    excitationCount,
+    collisions,
+    totalDistance,
+    totalTime: time,
+    absorbed: energy < MIN_ENERGY
+  };
 }
 
 /**
- * Monte Carlo 시뮬레이션 실행
+ * 탄성 충돌에서의 에너지 손실 계산
+ * @param {number} energy - 전자 에너지 (eV)
+ * @returns {number} 에너지 손실 (eV)
  */
-export const runMonteCarloSimulation = async (csvData, params, progressCallback) => {
+function calculateElasticEnergyLoss(energy) {
+  // 전자-아르곤 탄성 충돌
+  // 평균 에너지 손실: ΔE = 2(m_e/M_Ar) × E × (1 - cos(θ))
+  // 간단한 근사: 평균적으로 매우 작은 손실
+  
+  const massRatio = CONSTANTS.ELECTRON_MASS / CONSTANTS.ARGON_MASS;
+  const averageCosTheta = 0.5;  // 평균 산란각
+  const energyLoss = 2 * massRatio * energy * (1 - averageCosTheta);
+  
+  return energyLoss;
+}
+
+/**
+ * 에너지로부터 속도 계산
+ * @param {number} energy - 에너지 (eV)
+ * @returns {number} 속도 (m/s)
+ */
+function getVelocityFromEnergy(energy) {
+  const energyJoule = energy * CONSTANTS.EV_TO_JOULE;
+  return Math.sqrt(2 * energyJoule / CONSTANTS.ELECTRON_MASS);
+}
+
+/**
+ * 전체 시뮬레이션 실행
+ * @param {Object} params - 시뮬레이션 파라미터
+ * @param {Object} crossSectionData - 단면적 데이터
+ * @param {Function} onProgress - 진행률 콜백
+ * @returns {Promise<Object>} 시뮬레이션 결과
+ */
+export async function runSimulation(params, crossSectionData, onProgress = null) {
+  const {
+    initialEnergy,
+    numElectrons,
+    gasDensity,
+    plasmaVoltage,
+    chamberVolume,
+    wallArea
+  } = params;
+  
   const results = {
     electrons: [],
-    ionizationDistribution: [],
-    avgIonizations: 0,
-    maxIonizations: 0,
-    avgCollisions: 0,
-    wallAbsorptionRate: 0,
-    totalIonizations: 0
+    ionizations: [],
+    excitations: [],
+    energyLosses: [],
+    collisionCounts: []
   };
   
-  const numElectrons = params.numElectrons || 10000;
-  const batchSize = 100;
-  
-  for (let i = 0; i < numElectrons; i += batchSize) {
-    const currentBatch = Math.min(batchSize, numElectrons - i);
+  // 각 전자 시뮬레이션
+  for (let i = 0; i < numElectrons; i++) {
+    const electronResult = traceElectron(initialEnergy, crossSectionData, params);
     
-    for (let j = 0; j < currentBatch; j++) {
-      const electron = new ElectronTracker(
-        params.initialEnergy,
-        params.gasDensity,
-        csvData,
-        params
-      );
-      
-      const result = electron.simulate();
-      results.electrons.push(result);
-      results.totalIonizations += result.ionizations;
-      
-      if (result.ionizations > results.maxIonizations) {
-        results.maxIonizations = result.ionizations;
-      }
-    }
+    results.electrons.push(electronResult);
+    results.ionizations.push(electronResult.ionizationCount);
+    results.excitations.push(electronResult.excitationCount);
+    results.energyLosses.push(initialEnergy - electronResult.finalEnergy);
+    results.collisionCounts.push(electronResult.collisions.length);
     
     // 진행률 업데이트
-    const progress = Math.floor(((i + currentBatch) / numElectrons) * 100);
-    if (progressCallback) {
-      progressCallback(progress);
+    if (onProgress && i % 10 === 0) {
+      const progress = ((i + 1) / numElectrons) * 100;
+      await onProgress(progress);
+      
+      // UI 업데이트를 위한 작은 지연
+      if (i % 100 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
     }
-    
-    // UI 업데이트를 위한 짧은 대기
-    await new Promise(resolve => setTimeout(resolve, 0));
   }
   
   // 통계 계산
-  results.avgIonizations = results.totalIonizations / numElectrons;
-  results.avgCollisions = results.electrons.reduce((sum, e) => sum + e.collisions, 0) / numElectrons;
-  
-  const wallAbsorbed = results.electrons.filter(e => e.finalEnergy < SIMULATION_CONFIG.MIN_ENERGY_THRESHOLD).length;
-  results.wallAbsorptionRate = wallAbsorbed / numElectrons;
-  
-  // 이온화 분포 생성
-  results.ionizationDistribution = new Array(results.maxIonizations + 1).fill(0);
-  results.electrons.forEach(e => {
-    results.ionizationDistribution[e.ionizations]++;
-  });
+  results.statistics = calculateStatistics(results);
   
   return results;
+}
+
+/**
+ * 결과 통계 계산
+ * @param {Object} results - 시뮬레이션 결과
+ * @returns {Object} 통계
+ */
+function calculateStatistics(results) {
+  const { ionizations, excitations, energyLosses, collisionCounts } = results;
+  
+  return {
+    ionization: {
+      mean: mean(ionizations),
+      std: standardDeviation(ionizations),
+      max: Math.max(...ionizations),
+      min: Math.min(...ionizations),
+      total: sum(ionizations)
+    },
+    excitation: {
+      mean: mean(excitations),
+      std: standardDeviation(excitations),
+      total: sum(excitations)
+    },
+    energyLoss: {
+      mean: mean(energyLosses),
+      std: standardDeviation(energyLosses)
+    },
+    collisions: {
+      mean: mean(collisionCounts),
+      std: standardDeviation(collisionCounts),
+      max: Math.max(...collisionCounts),
+      min: Math.min(...collisionCounts)
+    },
+    survivalRate: results.electrons.filter(e => !e.absorbed).length / results.electrons.length
+  };
+}
+
+// 유틸리티 함수들
+function mean(arr) {
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function sum(arr) {
+  return arr.reduce((a, b) => a + b, 0);
+}
+
+function standardDeviation(arr) {
+  const avg = mean(arr);
+  const squareDiffs = arr.map(value => Math.pow(value - avg, 2));
+  const avgSquareDiff = mean(squareDiffs);
+  return Math.sqrt(avgSquareDiff);
+}
+
+export default {
+  traceElectron,
+  runSimulation,
+  calculateStatistics
 };
