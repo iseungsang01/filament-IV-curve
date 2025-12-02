@@ -8,6 +8,7 @@ import AnalysisPage from './pages/AnalysisPage';
 import ResultsPage from './pages/ResultsPage';
 import DetailPage from './pages/DetailPage';
 import ExportPage from './pages/ExportPage';
+import AComparisonPage from './pages/AComparisonPage';
 import './App.css';
 
 function AppContent() {
@@ -31,6 +32,8 @@ function AppContent() {
         return <DetailPage />;
       case 'export':
         return <ExportPage />;
+      case 'aComparison':
+        return <AComparisonPage />;
       default:
         return <HomePage />;
     }

@@ -2,6 +2,7 @@
 // src/utils/mainAnalysis.js
 // 개선된 플라즈마 프로브 분석 알고리즘
 // Python 방식의 정밀 추정 + 물리적 타당성 강화
+// + a 계수 비교 함수 추가
 // ============================================
 
 const e = 1.602e-19;  // 전자 전하량 (C)
@@ -12,8 +13,7 @@ const me = 9.109e-31; // 전자 질량 (kg)
  * Child-Langmuir 모델 (이온 전류)
  * 음의 전압 영역에서 sheath expansion 효과 포함
  */
-function childLangmuirModel(V, Vp, Te, Isat) {
-  const a = 1.02; // Sheath expansion coefficient (표준값)
+function childLangmuirModel(V, Vp, Te, Isat, a = 1.02) {
   const base = (Vp - V) / Te;
   
   if (base <= 0) return Isat;
@@ -115,12 +115,12 @@ function estimateVpInitial(voltage, current) {
  * **핵심 개선**: 정밀한 Vp/Te 추정
  * Python 방식: Transition & Saturation 영역의 직선 교점
  */
-function estimateVpAndTePrecise(voltage, current, VpGuess, Isat) {
+function estimateVpAndTePrecise(voltage, current, VpGuess, Isat, a = 1.02) {
   const Te_initial = 2.0;
   
   // 1. 이온 전류 모델 계산
   const ionCurrent = voltage.map(v => 
-    childLangmuirModel(v, VpGuess, Te_initial, Isat)
+    childLangmuirModel(v, VpGuess, Te_initial, Isat, a)
   );
   
   // 2. 전자 전류 분리
@@ -224,6 +224,7 @@ export async function analyzeSingleFile(fileData, params, onProgress) {
     let { voltage, current } = fileData;
     const { filename, position } = fileData;
     const { probeRadius, ionMass, maxIterations, tolerance } = params;
+    const a = params.aCoefficient || 1.02;
     
     // 전처리
     const processed = preprocessData(voltage, current);
@@ -250,7 +251,7 @@ export async function analyzeSingleFile(fileData, params, onProgress) {
       }
       
       // 정밀 추정 (Python 방식)
-      const result = estimateVpAndTePrecise(voltage, current, Vp, Isat);
+      const result = estimateVpAndTePrecise(voltage, current, Vp, Isat, a);
       
       // Damping factor로 부드러운 수렴
       Vp = 0.6 * Vp + 0.4 * result.Vp;
@@ -267,7 +268,7 @@ export async function analyzeSingleFile(fileData, params, onProgress) {
     }
     
     // 최종 정밀 추정
-    const finalResult = estimateVpAndTePrecise(voltage, current, Vp, Isat);
+    const finalResult = estimateVpAndTePrecise(voltage, current, Vp, Isat, a);
     Vp = finalResult.Vp;
     Te = finalResult.Te;
     Ies = finalResult.Ies;
@@ -374,6 +375,25 @@ export async function analyzeMultipleFiles(filesData, params, onFileProgress) {
     results.push(result);
     
     await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  return results;
+}
+
+/**
+ * **새로운 함수**: 다양한 a 값으로 분석
+ * @param {Object} fileData - 파일 데이터
+ * @param {Object} params - 분석 파라미터
+ * @param {Array} aValues - a 값 배열 (예: [0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
+ * @returns {Array} 각 a 값에 대한 분석 결과 배열
+ */
+export async function analyzeWithDifferentA(fileData, params, aValues) {
+  const results = [];
+  
+  for (const a of aValues) {
+    const modifiedParams = { ...params, aCoefficient: a };
+    const result = await analyzeSingleFile(fileData, modifiedParams, null);
+    results.push(result);
   }
   
   return results;

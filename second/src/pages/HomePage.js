@@ -1,10 +1,10 @@
 // ============================================
 // src/pages/HomePage.js
-// 메인 홈페이지 (알고리즘 페이지 링크 추가)
+// 메인 홈페이지 (알고리즘 페이지 + a 비교 페이지 링크 추가)
 // ============================================
 import React from 'react';
 import { useAnalysis } from '../context/AnalysisContext';
-import { Upload, Settings, BarChart3, FileText, Zap, Book, HelpCircle } from 'lucide-react';
+import { Upload, Settings, BarChart3, FileText, Zap, Book, HelpCircle, GitCompare } from 'lucide-react';
 
 export default function HomePage() {
   const { setCurrentPage, resetAnalysis } = useAnalysis();
@@ -34,6 +34,13 @@ export default function HomePage() {
           <button style={styles.algorithmButton} onClick={() => setCurrentPage('algorithm')}>
             <Book size={20} />
             <span>Algorithm Documentation</span>
+          </button>
+        </div>
+        
+        <div style={styles.buttonGroup}>
+          <button style={styles.comparisonButton} onClick={() => setCurrentPage('aComparison')}>
+            <GitCompare size={20} />
+            <span>Compare a Coefficients</span>
           </button>
         </div>
         
@@ -162,7 +169,7 @@ const styles = {
     gap: '1rem',
     justifyContent: 'center',
     flexWrap: 'wrap',
-    marginBottom: '1.5rem'
+    marginBottom: '1rem'
   },
   startButton: {
     display: 'inline-flex',
@@ -191,6 +198,19 @@ const styles = {
     fontWeight: '600',
     transition: 'all 0.3s'
   },
+  comparisonButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    padding: '1rem 2rem',
+    backgroundColor: 'white',
+    color: '#10B981',
+    border: '2px solid #10B981',
+    borderRadius: '12px',
+    fontSize: '1.125rem',
+    fontWeight: '600',
+    transition: 'all 0.3s'
+  },
   helpBanner: {
     display: 'flex',
     alignItems: 'center',
@@ -200,7 +220,8 @@ const styles = {
     backgroundColor: '#EEF2FF',
     borderRadius: '8px',
     color: '#4C1D95',
-    fontSize: '0.875rem'
+    fontSize: '0.875rem',
+    marginTop: '1.5rem'
   },
   features: {
     maxWidth: '1200px',

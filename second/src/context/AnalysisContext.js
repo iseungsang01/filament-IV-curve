@@ -20,7 +20,7 @@ export function AnalysisProvider({ children }) {
     magneticField: 0.001,       // 0.001 T = 10 Gauss
     maxIterations: 100,
     tolerance: 1e-6,
-    aCoefficient: 0.5
+    aCoefficient: 1.02          // 기본값 1.02 (고정 아님)
   });
   
   // 분석 진행 상태

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAnalysis } from '../context/AnalysisContext';
-import { ArrowLeft, Download, Eye, TrendingUp, Activity } from 'lucide-react';
+import { ArrowLeft, Download, Eye, TrendingUp, Activity, GitCompare } from 'lucide-react';
 import Plot from 'react-plotly.js';
 
 export default function ResultsPage() {
@@ -241,10 +241,16 @@ export default function ResultsPage() {
           <span>Back</span>
         </button>
         <h2 style={styles.title}>Step 4/5: Analysis Results</h2>
-        <button style={styles.exportButton} onClick={() => setCurrentPage('export')}>
-          <Download size={20} />
-          <span>Export</span>
-        </button>
+        <div style={styles.headerButtons}>
+          <button style={styles.compareButton} onClick={() => setCurrentPage('aComparison')}>
+            <GitCompare size={20} />
+            <span>Compare a</span>
+          </button>
+          <button style={styles.exportButton} onClick={() => setCurrentPage('export')}>
+            <Download size={20} />
+            <span>Export</span>
+          </button>
+        </div>
       </div>
       
       <div style={styles.content}>
@@ -382,7 +388,9 @@ const styles = {
     margin: '0 auto 2rem',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: '1rem'
   },
   backButton: {
     display: 'flex',
@@ -398,7 +406,24 @@ const styles = {
   title: {
     fontSize: '1.5rem',
     fontWeight: 'bold',
-    color: '#1A202C'
+    color: '#1A202C',
+    flex: 1
+  },
+  headerButtons: {
+    display: 'flex',
+    gap: '0.5rem'
+  },
+  compareButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.5rem 1rem',
+    backgroundColor: '#D1FAE5',
+    color: '#065F46',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '0.875rem',
+    fontWeight: '600'
   },
   exportButton: {
     display: 'flex',
